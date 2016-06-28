@@ -1,0 +1,89 @@
+; Sintesis de Sistemas Digitales en FPGA - Ej de la presentación
+; Se ingresa un dato al llegar la interrupción. Si es impar se presenta en 
+; los leds su C1. Si es par se lo presenta, también en los leds, sin cambios.
+; directiva para crear el bloque de memoria
+                    VHDL      "ROM_Pico3.vhd", "aplicacion.vhd", "memoria"
+
+Pin                 DSIN      $00                 ; puerto de entrada
+Pout                DSOUT     $01                 ; puerto de salida
+
+mascara             EQU       $01                 ; mascara para recuperar el bit msb 
+cantidad_valores    EQU       $04                 ; cantidad de valores en los registros del PB
+dir_indice          EQU       $04                 ; direccion del indice del dato actual
+;;; dir_dato            EQU       $05                 ; direccion del dato actual
+
+                    ORG       0                   ; SE ALOCA EL CODIGO AL INICIO DEL BLOQUE DE MEMORIA
+
+
+STORE               00,       00                  ; Write register sX to RAM location 00 - first
+STORE               05,       01                  ; Write register sX to RAM location 01 - second
+STORE               10,       02                  ; Write register sX to RAM location 02 - thirth
+STORE               28,       03                  ; Write register sX to RAM location 03 - fouth
+STORE               00,       04                  ; guardo el indice del dato procesado
+;;; STORE               01,       05                  ; guardo el dato que primero procesará
+                    
+                    XOR       s4, s4              ; para manipular la entrada y presentar los resultados en el puerto de salida
+
+                    EINT                          ; SE HABILITAN LAS INTERRUPCIONES
+
+Inicio:                                           ; bucle en espera de interrupciones
+
+                    LOAD      sB, sB              ; NOP
+                    JUMP      Inicio
+
+INTERRUPCIONES:                                   ; AQUÍ EL CODIGO DE LA RUTINA DE INTERRUPCION     
+                    IN        s4, Pin             ; leemos el dato
+
+                    LOAD      s5, s4
+                    AND       s5, $f0             ; tomo la parte alta del dato
+                    Compare   s5, $30             ; Se verifica si la parte alta es '0011'
+                    JUMP      NZ, nivel_alto      ; si NO es igual saca $ff
+
+                    LOAD      s5, s4
+                    AND       s5, $0f             ; tomo la parte baja del dato
+                    Compare   s5, $0A             ; Se verifica si es menor a '1010'
+                    JUMP      NC, nivel_alto      ; si NO es menor saca $ff
+
+                    LOAD      s4, s5              ; la parte baja del caracter es el numero. lo copio
+                    TEST      s4, mascara         ; Se verifica si el dato es par o impar
+                    JUMP      Z, dato_par         ; si es par PROMEDIO
+                    XOR       s4, $FF             
+                    ADD       s4, 01              ; complento a 2.
+
+
+final: 
+                    OUT       s4, Pout            ; se presenta el resultado en el puerto de salida
+                    RETI      ENABLE              ; AL VOLVER DE LA RUTINA DE INT SE HABILITAN DE NUEVO
+
+                    ORG       $3FF                ; EL VECTOR DE INTERUPCIONES EN LA ULTIMA DIRECCION
+                    JUMP      INTERRUPCIONES      ; a la rutina de servicio
+
+
+
+nivel_alto: 
+
+                    LOAD      s4, $FF             ; enciendo todos los leds.
+                    JUMP      final               ; a la rutina final
+
+
+dato_par: 
+
+                    FETCH     s6, dir_indice      ; cargo el indice
+                    FETCH     s5, s6              ; cargo el DATO a promediar
+
+                    Compare   s6, cantidad_valores ; es menor a cantidad_valores
+                    JUMP      NC, ultimo          ; si NO es menor salta
+
+     primeros_3_pares: 
+                    ADD       s6, 1               ; incremento en 1 al indice.
+                    JUMP      promedio
+
+     ultimo: 
+                    LOAD      s6, 0               ; pongo en cero el indice
+
+     promedio: 
+
+                    STORE     s6, dir_indice      ; guardo el indice
+                    ADD       s4, s5              ; sumo.
+                    SR0       s4                  ; desplazo a derecha (division entera en 2).
+                    JUMP      final               ; a la rutina final
