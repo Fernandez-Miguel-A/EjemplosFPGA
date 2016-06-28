@@ -1,0 +1,55 @@
+; Sintesis de Sistemas Digitales en FPGA - Ej de la presentación
+; Se ingresa un dato al llegar la interrupción. Si es impar se presenta en 
+; los leds su C1. Si es par se lo presenta, también en los leds, sin cambios.
+; directiva para crear el bloque de memoria
+                    VHDL      "ROM_Pico3.vhd", "aplicacion.vhd", "memoria"
+
+Pin                 DSIN      $00                 ; puerto de entrada
+Pout                DSOUT     $01                 ; puerto de salida
+
+mascara             EQU       $01                 ; mascara para recuperar el bit msb 
+
+                    ORG       0                   ; SE ALOCA EL CODIGO AL INICIO DEL BLOQUE DE MEMORIA
+
+                    
+                    XOR       s4, s4              ; para manipular la entrada y presentar los resultados en el puerto de salida
+
+                    EINT                          ; SE HABILITAN LAS INTERRUPCIONES
+
+Inicio:                                           ; bucle en espera de interrupciones
+
+                    LOAD      sB, sB              ; NOP
+                    JUMP      Inicio
+
+INTERRUPCIONES:                                   ; AQUÍ EL CODIGO DE LA RUTINA DE INTERRUPCION	
+                    IN        s4, Pin             ; leemos el dato
+
+                    LOAD      s5, s4
+                    AND       s5, $f0             ; tomo la parte alta del dato
+                    Compare   s5, $30             ; Se verifica si la parte alta es '0011'
+                    JUMP      NZ, nivel_alto      ; si NO es igual saca $ff
+                    
+                    LOAD      s5, s4
+                    AND       s5, $0f             ; tomo la parte baja del dato
+                    Compare   s5, $0A             ; Se verifica si es menor a '1010'
+                    JUMP      NC, nivel_alto      ; si NO es menor saca $ff
+
+                    LOAD      s4, s5              ; la parte baja es el numero. lo copio
+                    TEST      s4, mascara         ; Se verifica si el dato es par o impar
+                    JUMP      Z, final			; dato par NO hago cambios
+                    XOR       s4, $FF             ; el dato ingresado es impar, se obtiene C1
+
+
+final: 
+                    OUT       s4, Pout            ; se presenta el resultado en el puerto de salida
+                    RETI      ENABLE              ; AL VOLVER DE LA RUTINA DE INT SE HABILITAN DE NUEVO
+
+                    ORG       $3FF                ; EL VECTOR DE INTERUPCIONES EN LA ULTIMA DIRECCION
+                    JUMP      INTERRUPCIONES      ; a la rutina de servicio
+
+
+
+nivel_alto: 
+
+                    LOAD      s4, $FF             ; enciendo todos los leds.
+                    JUMP      final               ; a la rutina final
