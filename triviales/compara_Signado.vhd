@@ -21,13 +21,13 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.STD_LOGIC_SIGNED.ALL;
 
-entity compara is
+entity compara_S is
     Port ( a : in std_logic_vector(3 downto 0);
            b : in std_logic_vector(3 downto 0);
            mayor: out std_logic);  
-end compara;
+end compara_S;
 
-architecture Behavioral of compara is
+architecture Behavioral of compara_S is
 
 begin
 mayor <= '1' when a > b else '0';
