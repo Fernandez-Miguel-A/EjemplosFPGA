@@ -36,7 +36,7 @@ entity registro_datos is
 end registro_datos;
 
 architecture Behavioral of registro_datos is
-tmp_data : out  STD_LOGIC_VECTOR (7 downto 0);
+signal tmp_data : STD_LOGIC_VECTOR (7 downto 0);
 type estados_M is (s1,s2,s3,s4);
 signal estado_MAIN: estados_M;
 begin
