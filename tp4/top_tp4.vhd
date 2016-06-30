@@ -121,7 +121,7 @@ component registro_datos is --  de trabajo_UART
 end component;
 
 component normalizar_interrupcion is
-    Port ( _signal, clk, rst, ack : in  STD_LOGIC;
+    Port ( raw_signal, clk, rst, ack : in  STD_LOGIC;
            norm_signal : out  STD_LOGIC);
 end component;
 
@@ -155,7 +155,7 @@ port map (clk => clk, rst => rst, in_data=> pre_leds,
 
     
 int1: normalizar_interrupcion 
-port map (clk => clk, rst => rst, _signal => UART_buffer_data_present, ack => interrupt_ack, norm_signal => interrupted);
+port map (clk => clk, rst => rst, raw_signal => UART_buffer_data_present, ack => interrupt_ack, norm_signal => interrupted);
 
 
 end Behavioral;

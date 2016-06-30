@@ -30,7 +30,7 @@ use IEEE.STD_LOGIC_UNSIGNED.ALL;
 
 
 entity normalizar_interrupcion is
-    Port ( _signal, clk, rst, ack : in  STD_LOGIC;
+    Port ( raw_signal, clk, rst, ack : in  STD_LOGIC;
            norm_signal : out  STD_LOGIC);
 end normalizar_interrupcion;
 
@@ -50,7 +50,7 @@ if rst = '1' then
 elsif clk = '1' and clk'event then
     case estado_MAIN is
         when s1 =>
-            if _signal = '1' then
+            if raw_signal = '1' then
                 estado_MAIN <= s2;
             end if;
         when s2 =>
@@ -58,11 +58,11 @@ elsif clk = '1' and clk'event then
         when s3 =>
             if ack = '1' then
                 estado_MAIN <= s4;
-            elsif _signal = '0' then
+            elsif raw_signal = '0' then
                 estado_MAIN <= s1;
             end if;
         when s4 =>
-            if _signal = '0' then
+            if raw_signal = '0' then
                 estado_MAIN <= s1;
             end if;
     end case;

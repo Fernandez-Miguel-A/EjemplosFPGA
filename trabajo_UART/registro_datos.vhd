@@ -71,6 +71,7 @@ begin
             out_data <= tmp_data;
         when s3 =>
             tmp_data <= in_data;
+        when others => null;
     end case;
 end process;
 
