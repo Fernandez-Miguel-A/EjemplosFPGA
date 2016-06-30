@@ -34,8 +34,8 @@ entity antiReb is
 end antiReb;
 
 
-architecture Behavioral of antiReb is
-signal reg: std_logic_vector(11 downto 0);
+architecture Behavioral of antiReb is -- Antirebote sin terminar ('Estable_p'), cambiar al
+signal reg: std_logic_vector(11 downto 0); -- otro tipo de antirebote
 begin
 
 process(clk,rst)
