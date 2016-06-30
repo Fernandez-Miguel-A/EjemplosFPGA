@@ -30,8 +30,8 @@ use IEEE.STD_LOGIC_UNSIGNED.ALL;
 
 
 
-entity 2prueba is
-    Port ( p : in  std_logic);
+entity 2prueba is -- debo definir las salidas aca NO en 'datos_suma' y además el nombre
+    Port ( p : in  std_logic); -- está mal, debe empezar con una letra
 end 2prueba;
 
 
