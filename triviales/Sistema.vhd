@@ -22,7 +22,7 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.STD_LOGIC_UNSIGNED.ALL;
 
-entity Sistema  is
+entity Sistema  is -- requiere contador y registro
     Port ( e1 : in  STD_LOGIC;
            e2 : in  STD_LOGIC;
            clk : in  STD_LOGIC;
