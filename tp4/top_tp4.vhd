@@ -112,7 +112,7 @@ component top_PB is
 end component;
 
 
-component registro_datos is
+component registro_datos is --  de trabajo_UART
     Port ( in_data : in  STD_LOGIC_VECTOR (7 downto 0);
            out_data : out  STD_LOGIC_VECTOR (7 downto 0);
            clk : in  STD_LOGIC;
