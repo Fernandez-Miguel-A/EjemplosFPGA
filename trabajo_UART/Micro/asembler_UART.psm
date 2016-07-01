@@ -26,12 +26,12 @@ INTERRUPCIONES:                                   ; AQUÍ EL CODIGO DE LA RUTINA 
 
                     LOAD      s5, s4
                     AND       s5, $f0             ; tomo la parte alta del dato
-                    Compare   s5, $30             ; Se verifica si la parte alta es '0011'
+                    COMP      s5, $30             ; Se verifica si la parte alta es '0011'
                     JUMP      NZ, nivel_alto      ; si NO es igual saca $ff
                     
                     LOAD      s5, s4
                     AND       s5, $0f             ; tomo la parte baja del dato
-                    Compare   s5, $0A             ; Se verifica si es menor a '1010'
+                    COMP      s5, $0A             ; Se verifica si es menor a '1010'
                     JUMP      NC, nivel_alto      ; si NO es menor saca $ff
 
                     LOAD      s4, s5              ; la parte baja es el numero. lo copio
