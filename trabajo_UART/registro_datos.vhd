@@ -45,7 +45,6 @@ process(clk,rst)
 begin
 if rst = '1' then
     estado_MAIN <= s1;
-    out_data <= (others => '0');
 elsif clk = '1' and clk'event then
     case estado_MAIN is
         when s1 =>
@@ -67,6 +66,8 @@ end process;
 process(estado_MAIN)
 begin
     case estado_MAIN is
+        when s1 =>
+            tmp_data <= (others => '0');
         when s2 =>
             out_data <= tmp_data;
         when s3 =>
@@ -74,8 +75,6 @@ begin
         when others => null;
     end case;
 end process;
-
-
 
 end Behavioral;
 
