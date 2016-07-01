@@ -8,22 +8,22 @@ Pin                 DSIN      $00                 ; puerto de entrada
 Pout                DSOUT     $01                 ; puerto de salida
 
 mascara             EQU       $01                 ; mascara para recuperar el bit msb 
-max_index    		EQU       $03                 ; cantidad de valores en los registros del PB 0->3 (4 valores)
+max_index           EQU       $03                 ; cantidad de valores en los registros del PB 0->3 (4 valores)
 dir_indice          EQU       $04                 ; direccion del indice del dato actual
 ;;; dir_dato            EQU       $05                 ; direccion del dato actual
 
                     ORG       $00                   ; SE ALOCA EL CODIGO AL INICIO DEL BLOQUE DE MEMORIA
 
 
-LOAD      			s4, 00              	  ; cargo en registro intermedio ' STORE SX, direc '
+LOAD                s4, 00                    ; cargo en registro intermedio ' STORE SX, direc '
 STORE               s4,       00                  ; Write register sX to RAM location 00 - first
-LOAD      			s4, 05              	  ; cargo en registro intermedio ' STORE SX, direc '
+LOAD                s4, 05                    ; cargo en registro intermedio ' STORE SX, direc '
 STORE               s4,       01                  ; Write register sX to RAM location 01 - second
-LOAD      			s4, 10              	  ; cargo en registro intermedio ' STORE SX, direc '
+LOAD                s4, 10                    ; cargo en registro intermedio ' STORE SX, direc '
 STORE               s4,       02                  ; Write register sX to RAM location 02 - thirth
-LOAD      			s4, 28              	  ; cargo en registro intermedio ' STORE SX, direc '
+LOAD                s4, 28                    ; cargo en registro intermedio ' STORE SX, direc '
 STORE               s4,       03                  ; Write register sX to RAM location 03 - fouth
-LOAD      			s4, 00              	  ; cargo en registro intermedio ' STORE SX, direc '
+LOAD                s4, 00                    ; cargo en registro intermedio ' STORE SX, direc '
 STORE               s4,       04                  ; guardo el indice del dato procesado
 ;;; STORE               01,       05                  ; guardo el dato que primero procesará
                     
@@ -75,7 +75,7 @@ dato_par:
 
                     FETCH     s6, dir_indice      ; cargo el indice
                     FETCH     s5, s6              ; cargo el DATO a promediar
-	 		  		;STORE     s5, $18
+                    ;STORE     s5, $18
 
                     COMP      s6, max_index       ; es menor a cantidad_valores
                     JUMP      NC, ultimo          ; si NO es menor salta
@@ -88,13 +88,13 @@ dato_par:
                     LOAD      s6, $00               ; pongo en cero el indice
 
      promedio:
-	 		  		;STORE     s4, $19
-	 		  		;STORE     s5, $1A
-	 		  		;STORE     s6, $1B
+                    ;STORE     s4, $19
+                    ;STORE     s5, $1A
+                    ;STORE     s6, $1B
                     STORE     s6, dir_indice      ; guardo el indice
                     ADD       s4, s5              ; sumo.
                     SR0       s4                  ; desplazo a derecha (division entera en 2).
-	 		  		;STORE     s4, $1C
+                    ;STORE     s4, $1C
                     JUMP      final               ; a la rutina final
 
 ISR:
