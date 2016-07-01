@@ -46,7 +46,6 @@ process(clk,rst)
 begin
 if rst = '1' then
     estado_MAIN <= s1;
-    norm_signal <= '0';
 elsif clk = '1' and clk'event then
     case estado_MAIN is
         when s1 =>
@@ -80,9 +79,9 @@ begin
             norm_signal <= '1';
         when s4 =>
             norm_signal <= '0';
+        when others => null;
     end case;
 end process;
-
 
 end Behavioral;
 
