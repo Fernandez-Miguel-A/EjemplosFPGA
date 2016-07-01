@@ -44,7 +44,7 @@ final:
                     OUT       s4, Pout            ; se presenta el resultado en el puerto de salida
                     RETI      ENABLE              ; AL VOLVER DE LA RUTINA DE INT SE HABILITAN DE NUEVO
 
-                    ORG       $3FF                ; EL VECTOR DE INTERUPCIONES EN LA ULTIMA DIRECCION
+                    ;ORG       $3FF                ; EL VECTOR DE INTERUPCIONES EN LA ULTIMA DIRECCION
                     JUMP      INTERRUPCIONES      ; a la rutina de servicio
 
 
@@ -53,3 +53,7 @@ nivel_alto:
 
                     LOAD      s4, $FF             ; enciendo todos los leds.
                     JUMP      final               ; a la rutina final
+
+ISR:
+     ORG       $3FF                ; EL VECTOR DE INTERUPCIONES EN LA ULTIMA DIRECCION
+     JUMP      INTERRUPCIONES      ; a la rutina de servicio
