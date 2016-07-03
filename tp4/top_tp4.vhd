@@ -29,23 +29,15 @@ use IEEE.STD_LOGIC_UNSIGNED.ALL;
 
 entity uart_eje1 is
     Port ( clk, rst : in  STD_LOGIC;
-                entrada_serial : in  STD_LOGIC;
-           --b : in  STD_LOGIC_VECTOR (7 downto 0);
+           entrada_serial : in  STD_LOGIC;
            leds : out STD_LOGIC_VECTOR (7 downto 0));
 end uart_eje1;
 
 
 
 architecture Behavioral of uart_eje1 is
---signal count: std_logic_vector(3 downto 0);
-
-
 --SEÑALES para los leds
 signal pre_leds : STD_LOGIC_VECTOR (7 downto 0);
-
---SEÑALES para registro pre leds
---signal entrada_seg : STD_LOGIC_VECTOR (3 downto 0);
-signal datos_entrada : STD_LOGIC_VECTOR (7 downto 0);
 
 --SEÑALES para UART
 signal UART_serial_in : STD_LOGIC;
@@ -65,17 +57,9 @@ signal streaming_byte : std_logic_vector(7 downto 0);
 signal interrupted : std_logic;
 signal interrupt_ack : std_logic;
 
---SEÑALES para registro1
---signal habilitar : STD_LOGIC; -- reemplazado por 'interrupt_ack'
-
 --SEÑALES para registro2
 signal habilitar : STD_LOGIC;
 
-
---component dec_hex_7_SEG 
---    Port ( entr : in  STD_LOGIC_VECTOR (3 downto 0);
---          sal : out  STD_LOGIC_VECTOR (6 downto 0));   
---end component;
 
 
 component divisor is
@@ -128,8 +112,6 @@ end component;
 
 begin
 
---segmentos: dec_hex_7_SEG 
---port map (entr => entrada_seg, sal => salida_leds);
 
 div_frec: divisor 
 port map (clk => clk, rst => rst, clk_4800=> UART_en_16_x_baud);
@@ -151,11 +133,13 @@ port map (clk => clk, rst => rst, in_data=> UART_data_out,
     
 registro2: registro_datos 
 port map (clk => clk, rst => rst, in_data=> pre_leds,
-    out_data=> datos_entrada, habilitador => writing);
+    out_data=> leds, habilitador => writing);
 
     
-int1: normalizar_interrupcion 
-port map (clk => clk, rst => rst, raw_signal => UART_buffer_data_present, ack => interrupt_ack, norm_signal => interrupted);
+--int1: normalizar_interrupcion 
+--port map (clk => clk, rst => rst, raw_signal => UART_buffer_data_present, ack => interrupt_ack, norm_signal => interrupted);
+
+interrupted <= UART_buffer_data_present;
 
 
 end Behavioral;
