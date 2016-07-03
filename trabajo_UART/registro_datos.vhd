@@ -36,8 +36,8 @@ entity registro_datos is
 end registro_datos;
 
 architecture Behavioral of registro_datos is
-signal tmp_data : STD_LOGIC_VECTOR (7 downto 0);
-type estados_M is (s1,s2,s3,s4);
+--signal tmp_data : STD_LOGIC_VECTOR (7 downto 0);
+type estados_M is (s1,s2,s3);
 signal estado_MAIN: estados_M;
 begin
 
@@ -52,26 +52,26 @@ elsif clk = '1' and clk'event then
                 estado_MAIN <= s2;
             end if;
         when s2 =>
-            estado_MAIN <= s3;
-        when s3 =>
-            estado_MAIN <= s4;
-        when s4 =>
             if habilitador = '0' then
-                estado_MAIN <= s1;
+                estado_MAIN <= s3;
+            end if;
+        when s3 =>
+            if habilitador = '1' then
+                estado_MAIN <= s2;
             end if;
     end case;
 end if;
 end process;
 
 process(estado_MAIN)
+variable tmp_data1, tmp_data2 : STD_LOGIC_VECTOR (7 downto 0):= (others => '0'); 
 begin
     case estado_MAIN is
-        when s1 =>
-            tmp_data <= (others => '0');
         when s2 =>
-            out_data <= tmp_data;
+            tmp_data1 := in_data;
+            out_data <= tmp_data2;
         when s3 =>
-            tmp_data <= in_data;
+            tmp_data2 := tmp_data1;
         when others => null;
     end case;
 end process;
