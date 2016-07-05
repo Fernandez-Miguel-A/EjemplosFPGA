@@ -29,15 +29,20 @@ use IEEE.STD_LOGIC_UNSIGNED.ALL;
 
 entity uart_eje1 is
     Port ( clk, rst : in  STD_LOGIC;
-                entrada_serial : in  STD_LOGIC;
-           --b : in  STD_LOGIC_VECTOR (7 downto 0);
+           entrada_serial : in  STD_LOGIC;
+			  switchs : in  STD_LOGIC_VECTOR (3 downto 0);
+           pulsador : in  STD_LOGIC;
            leds : out STD_LOGIC_VECTOR (7 downto 0));
 end uart_eje1;
 
 
 
 architecture Behavioral of uart_eje1 is
---signal count: std_logic_vector(3 downto 0);
+signal interrupcion_pulsador: std_logic;
+signal from_PC : STD_LOGIC;
+
+signal data_IN : STD_LOGIC_VECTOR (7 downto 0);
+--signal data_leds : STD_LOGIC_VECTOR (7 downto 0);
 
 
 --SEÃ‘ALES para los leds
@@ -52,7 +57,6 @@ signal datos_salida : STD_LOGIC_VECTOR (7 downto 0);
 signal UART_serial_in : STD_LOGIC;
 signal UART_data_out : STD_LOGIC_vector(7 downto 0);
 signal UART_read_buffer : STD_LOGIC;
-signal UART_en_16_x_baud : STD_LOGIC;
 signal UART_buffer_data_present : STD_LOGIC;
 signal UART_buffer_full : STD_LOGIC;
 signal UART_buffer_half_full : STD_LOGIC;
@@ -64,7 +68,9 @@ signal writing : std_logic;
 signal reading : std_logic;
 signal streaming_byte : std_logic_vector(7 downto 0);
 signal interrupted : std_logic;
+
 signal interrupt_ack : std_logic;
+signal interrupt_ack1 : std_logic;
 
 signal interrupt_ack2 : std_logic;
 signal port_id_PICO : std_logic_vector(7 downto 0);
@@ -76,31 +82,16 @@ signal port_id_PICO : std_logic_vector(7 downto 0);
 signal habilitar : STD_LOGIC;
 
 
---component dec_hex_7_SEG 
---    Port ( entr : in  STD_LOGIC_VECTOR (3 downto 0);
---          sal : out  STD_LOGIC_VECTOR (6 downto 0));   
---end component;
-
-
-component divisor is
+component UART_4800 is
     Port ( clk, rst : in STD_LOGIC;
-            clk_4800 : out STD_LOGIC);
-end component;
-
-
-
-component uart_rx 
-    Port (            serial_in : in std_logic;
-                       data_out : out std_logic_vector(7 downto 0);
-                    read_buffer : in std_logic;
-                   reset_buffer : in std_logic;
-                   en_16_x_baud : in std_logic;
-            buffer_data_present : out std_logic;
-                    buffer_full : out std_logic;
-               buffer_half_full : out std_logic;
-                            clk : in std_logic);
-end component;
-
+           entrada_serial : in STD_LOGIC;
+           leer_data : in STD_LOGIC;
+           next_data : in STD_LOGIC;
+           data_present : out STD_LOGIC;
+           buff_full : out STD_LOGIC;
+           buff_half : out STD_LOGIC;
+           dato_sal : out STD_LOGIC_VECTOR (7 downto 0));
+end component ;
 
 
 component top_PB is
@@ -124,48 +115,60 @@ component registro_datos is --  de trabajo_UART
            habilitador : in  STD_LOGIC);
 end component;
 
-component normalizar_interrupcion is
-    Port ( raw_signal, clk, rst, ack : in  STD_LOGIC;
-           norm_signal : out  STD_LOGIC);
+
+component controlador_boton is
+    Port ( clk, rst, ack : in  STD_LOGIC;
+           pulsador : in  STD_LOGIC;
+           norm_signal : out STD_LOGIC);
 end component;
+
 
 
 begin
 
---segmentos: dec_hex_7_SEG 
---port map (entr => entrada_seg, sal => salida_leds);
-
-div_frec: divisor 
-port map (clk => clk, rst => rst, clk_4800=> UART_en_16_x_baud);
-
-RX_UART: uart_rx 
-port map (serial_in => entrada_serial, data_out => UART_data_out, read_buffer => UART_read_buffer,
-    reset_buffer => rst, en_16_x_baud => UART_en_16_x_baud, buffer_data_present => UART_buffer_data_present,
-    buffer_full => UART_buffer_full, buffer_half_full => UART_buffer_half_full, clk => clk);
+RX_UART: UART_4800 
+port map (clk => clk, rst => rst, next_data => interrupt_ack1,
+	entrada_serial => entrada_serial, dato_sal => streaming_byte,
+	leer_data => UART_read_buffer, data_present => UART_buffer_data_present,
+   buff_full => UART_buffer_full, buff_half => UART_buffer_half_full);
 
 microcontrolador: top_PB 
 port map (write_strobe => writing, out_port => pre_leds, read_strobe => UART_read_buffer,
-    in_port => streaming_byte, interrupt => interrupted, port_id => port_id_PICO,
+    in_port => data_IN, interrupt => interrupted, port_id => port_id_PICO,
     interrupt_ack => interrupt_ack, reset => rst, clk => clk);
 
-registro1: registro_datos 
-port map (clk => clk, rst => rst, in_data=> UART_data_out,
-    out_data=> streaming_byte, habilitador => interrupt_ack2); --tambien
---debo pensar a quien y como le notifica el reconocimiento de la INTERRUPCIÓN
-    
     
 registro2: registro_datos 
 port map (clk => clk, rst => rst, in_data=> pre_leds,
-    out_data=> datos_salida, habilitador => writing);
+    out_data=> leds, habilitador => writing);
 
   
 --necesito una maquinita de estados para determinar cual
 --es la señal FUENTE, la UART ó el 'boton estabilizado';
 --si es el boton debo Normalizar!.
 
---int1: normalizar_interrupcion 
---port map (clk => clk, rst => rst, raw_signal => UART_buffer_data_present, ack => interrupt_ack, norm_signal => interrupted);
-interrupted <= UART_buffer_data_present;
 
+contr_boton: controlador_boton 
+port map (clk => clk, rst => rst, ack => interrupt_ack2,
+	pulsador=> pulsador, norm_signal => interrupcion_pulsador);
+
+
+
+interrupted <= interrupcion_pulsador or UART_buffer_data_present;
+data_IN <= streaming_byte when from_PC = '1' else ("0000"&switchs);
+
+from_PC <= '1' when interrupcion_pulsador = '1' and UART_buffer_data_present = '1' else
+			  '0' when interrupcion_pulsador = '1' else '1';
+			  
+			  
+--interrupt_ack1 <= interrupt_ack; -- en realidad debo 
+--interrupt_ack2 <= interrupt_ack; -- 
+
+interrupt_ack1 <= interrupt_ack when from_PC = '1' else '0';
+interrupt_ack2 <= interrupt_ack when from_PC = '0' else '0';
+			
+-- debo comunicar a los 2 dispositivos de entrada que estoy 
+-- tomando datos 'UART_read_buffer'!
+			  
 end Behavioral;
 
