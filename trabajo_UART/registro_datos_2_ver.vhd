@@ -41,7 +41,7 @@ begin
 process(clk,rst)
 begin
 if rst = '1' then
-    out_data <=  (others => '1');
+    out_data <=  (others => '0');
 elsif clk = '1' and clk'event then
     if habilitador = '1' then
         out_data <= in_data;
