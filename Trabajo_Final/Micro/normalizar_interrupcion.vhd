@@ -38,7 +38,7 @@ end normalizar_interrupcion;
 
 
 architecture Behavioral of normalizar_interrupcion is
-type estados_M is (s1,s2,s3);
+type estados_M is (s1,s2,s3);--,s4);
 signal estado_MAIN: estados_M;
 begin
 
@@ -57,6 +57,8 @@ elsif clk = '1' and clk'event then
                 estado_MAIN <= s3;
             end if;
         when s3 =>
+--            estado_MAIN <= s4;
+--        when s4 =>
             if raw_signal = '0' then
                 estado_MAIN <= s1;
             end if;
@@ -72,8 +74,9 @@ begin
         when s2 =>
             norm_signal <= '1';
         when s3 =>
+--            norm_signal <= '1';
+--        when s4 =>
             norm_signal <= '0';
-        when others => null;
     end case;
 end process;
 
