@@ -99,11 +99,11 @@ FIJO:               ;(NO intermitente)
 
                     XOR       s5, s5               
                     TEST      s4, $0F             
-                    JUMP      NC, continue        ; NO tiene paridad impar
+                    JUMP      C, continue        ; NO tiene paridad impar
                     
-                    SL0       s5
+                    SL1       s5
         continue:
-                    SL1       s4
+                    SL0       s4
                     ADD       s4, s5
 
                     LOAD      s7, s4
