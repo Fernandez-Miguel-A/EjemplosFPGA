@@ -101,9 +101,9 @@ FIJO:               ;(NO intermitente)
                     TEST      s4, $0F             
                     JUMP      NC, continue        ; NO tiene paridad impar
                     
-                    SL1       s5
+                    SL0       s5
         continue:
-                    SL0       s4          
+                    SL1       s4
                     ADD       s4, s5
 
                     LOAD      s7, s4
