@@ -55,7 +55,6 @@ signal buf_switch_UART_H : STD_LOGIC;
 signal Enable : STD_LOGIC;
 
 signal out_micro : STD_LOGIC_VECTOR (7 downto 0);
-signal reg_int_PBlaze : STD_LOGIC_VECTOR (7 downto 0);
 signal reg_out_PBlaze : STD_LOGIC_VECTOR (7 downto 0);
 signal pre_leds : STD_LOGIC_VECTOR (7 downto 0);
 signal TO_LEDS : STD_LOGIC_VECTOR (7 downto 0);
@@ -70,7 +69,6 @@ signal UART_buffer_half_full : STD_LOGIC;
 signal reading : std_logic;
 signal writing : std_logic;
 signal interrupted : std_logic;
-signal LCD_H : std_logic;
 
 signal interrupt_ack : std_logic;
 signal interrupt_UART : std_logic;
@@ -81,12 +79,10 @@ signal direccion : std_logic_vector(3 downto 0); --integer
 signal dato_rom : STD_LOGIC_VECTOR (7 downto 0);
 
 --LCD
-signal habilitador : STD_LOGIC;
 signal passed: STD_LOGIC;
 signal next_data : std_logic;
 signal buf_next_direc : std_logic;
 signal buf_next_data : std_logic;
-signal pre_LCD : std_logic_vector(7 downto 0);
 signal out_REG : std_logic_vector(7 downto 0);
 signal port_id_PICO : std_logic_vector(7 downto 0);
 
@@ -95,11 +91,6 @@ signal ControlZ : STD_LOGIC;
 
 signal next_direc : STD_LOGIC;
 
-
-
-
---type fuente_interrupt is (from_PC,from_PULSADOR);
---signal FUENTE_I: fuente_interrupt;
 
 
 component UART_4800 is
@@ -156,12 +147,6 @@ port map (clk => clk, rst => rst, next_data => interrupt_UART,
 	entrada_serial => entrada_serial, dato_sal => streaming_BYTE,
 	leer_data => interrupt_UART, data_present => UART_buffer_data_present,
    buff_full => UART_buffer_full, buff_half => UART_buffer_half_full);
-
---
---registro_entrada_PBlaze: registro_datos 
---port map (clk => clk, rst => rst, in_data=> data_IN,
---    out_data=> reg_int_PBlaze, habilitador => writing);
---	 
 	 
 microcontrolador: top_PB 
 port map (write_strobe => writing, out_port => out_micro, read_strobe => reading,--UART_read_buffer,
@@ -192,8 +177,6 @@ port map (clk => clk, rst => rst, ack => interrupt_PULSADOR,
 memoria_strings: MROM 
 port map (dir => direccion, datos => dato_rom);
 
---LCD_H <= next_data or salida_principal_H;
-
 
 salida_principal_H <= port_id_PICO(0) and (not port_id_PICO(6)) and writing;
 
@@ -203,19 +186,15 @@ begin
 if clk = '1' and clk'event then
 	buf_salida_principal_H <= salida_principal_H;
 	buf_next_data <= next_data;
-	
---	switch_UART_H <= buf_switch_UART_H;
---	next_direc <= buf_next_direc;
 end if;
 end process;
 
 
-	switch_UART_H <= buf_switch_UART_H;
-	next_direc <= buf_next_direc;
+switch_UART_H <= buf_switch_UART_H;
+next_direc <= buf_next_direc;
 
 
 --TO_LEDS <= pre_leds when CONV_INTEGER(direccion) = 0 else "0000"&direccion;
---TO_LEDS <= passed&next_direc&salida_principal_H&'0'&direccion;
 leds <= pre_leds;--TO_LEDS;
 
 data_SWITCH <= "0000"&switchs;
@@ -225,30 +204,10 @@ data_UART <= '1'&streaming_BYTE(6 downto 0);
 interrupted <= interrupcion_pulsador or UART_buffer_data_present;
 
 
---UART_read_buffer <= reading when interrupt_UART = '1' else '0';
-
 interrupt_UART <= interrupt_ack when UART_buffer_data_present = '1' else '0';
 interrupt_PULSADOR <= interrupt_ack;
 
-
 buf_switch_UART_H <= port_id_PICO(0) and (not port_id_PICO(2)) and reading;
---UART_H <= port_id_PICO(0) and (not port_id_PICO(2)) and reading;
-
-
---tres_entradas: process(clk, rst)
---begin
---if rst = '1' then
---	data_IN <= dato_rom;
---elsif clk = '1' and clk'event then
---	if next_direc = '0' and switch_UART_H = '1' and UART_buffer_data_present = '1' then -- FUENTE_I = from_PC
---		data_IN <= data_UART;
---	elsif next_direc = '0' and switch_UART_H = '1' and interrupcion_pulsador = '1' and UART_buffer_data_present = '0' then
---		data_IN <= data_SWITCH;
---	else
---		data_IN <= dato_rom;
---	end if;
---end if;
---end process;
 
 
 UART_and_SWITCHs: process(clk, rst)
@@ -256,15 +215,13 @@ begin
 if rst = '1' then
 	data_IN <= dato_rom;
 elsif clk = '1' and clk'event then
-	--if Enable = '1' then
-		if Enable = '1' then  --if next_direc = '1' or CONV_INTEGER(direccion) /= 0 then
+		if Enable = '1' then
 			data_IN <= dato_rom;
 		elsif Enable = '0' and interrupcion_pulsador = '1' and UART_buffer_data_present = '0' then
 			data_IN <= data_SWITCH;
 		elsif Enable = '0' and interrupcion_pulsador = '0' and UART_buffer_data_present = '1' then -- FUENTE_I = from_PC
 			data_IN <= data_UART;
 		end if;
-	--end if;
 end if;
 end process;
 
