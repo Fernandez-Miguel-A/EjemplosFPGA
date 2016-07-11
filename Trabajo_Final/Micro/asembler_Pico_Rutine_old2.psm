@@ -1,0 +1,198 @@
+; Sintesis de Sistemas Digitales en FPGA - Ej de la presentación
+; Se ingresa un dato al llegar la interrupción. Si es impar se presenta en 
+; los leds su C1. Si es par se lo presenta, también en los leds, sin cambios.
+; directiva para crear el bloque de memoria
+                    VHDL      "ROM_Pico3.vhd", "aplicacion.vhd", "memoria"
+
+Pin                 DSIN      $00                 ; puerto de entrada
+Pout                DSOUT     $01                 ; puerto de salida
+
+delay_1us_constant  EQU       11
+digito              EQU       $FF
+caracter_cualquiera EQU       $0
+switchs             EQU       $0F
+
+                    ORG       $00                 ; SE ALOCA EL CODIGO AL INICIO DEL BLOQUE DE MEMORIA
+                    
+                    XOR       s4, s4              ; para manipular la entrada y presentar los resultadosen el puerto de salida
+                    LOAD      s6, digito   
+                    XOR       s7, s7
+
+;////////////////////////////////////////////////////////////////////////
+Inicio:
+;////////////////////////////////////////////////////////////////////////
+
+
+                    DINT                          ; SE DESHABILITAN LAS INTERRUPCIONES
+                    COMP      s6, digito
+                    JUMP      Z, sacar_dato       ; si es un digito salta
+                    COMP      s6, caracter_cualquiera
+                    JUMP      NZ, sacar_dato      ; si SWITCHS salta
+                    ; es un caracter cualquiera! 
+
+intermitente:
+                    EINT                          ; SE HABILITAN LAS INTERRUPCIONES
+                    call delay_125ms
+                    call delay_125ms
+                         
+                    DINT                          ; SE DESHABILITAN LAS INTERRUPCIONES
+                    COMP      s6, digito
+                    JUMP      Z, digito_decimal   ; si es un digito salta
+                    COMP      s6, caracter_cualquiera
+                    JUMP      NZ, sacar_dato      ; si SWITCHS salta
+
+                    XOR       s7, $FF             ; invierte bits
+
+                    JUMP      sacar_dato          ; UART->caracter_cualquiera | SWITCHS
+
+digito_decimal:                                   ; es un numero!.
+                    LOAD      s7, $FF             ; enciendo todos los leds.
+
+
+sacar_dato:
+                    EINT                          ; SE HABILITAN LAS INTERRUPCIONES
+                    OUT       s7, Pout
+                    JUMP      Inicio
+
+
+
+
+
+;--------------*--*-*-*--*-*--*-*-*-
+fromUART:
+                    LOAD      s7, $FF             ; enciendo todos los leds.
+                    LOAD      s5, s4
+                    AND       s5, $F0             ; tomo la parte alta del dato
+                    COMP      s5, $30             ; Se verifica si la parte alta es '0011'
+                    JUMP      NZ, set_intermitente  ; si NO es igual pasa a intermitente
+
+                    ;IGUALES
+                    LOAD      s5, s4
+                    AND       s5, $0F             ; tomo la parte baja del dato
+                    COMP      s5, $0A             ; Se verifica si es menor a '1010'
+                    JUMP      NC, set_intermitente  ; si es mayor que 9 salta
+
+set_FIJO:           ;(NO intermitente)
+                    LOAD      s6, digito
+                    JUMP      fin_ISR
+
+
+set_intermitente:  
+                    LOAD      s6, caracter_cualquiera
+
+
+fin_ISR:
+                    RETI      ENABLE
+
+
+
+
+
+
+
+
+;--------------*--*-*-*--*-*--*-*-*-
+
+fromSWITCHS:                                      ; bucle en espera de interrupciones
+FIJO:               ;(NO intermitente)
+                    LOAD      s6, switchs
+
+                    XOR       s5, s5               
+                    TEST      s4, $0F             
+                    JUMP      C, continue        ; NO tiene paridad impar
+                    
+                    SL1       s5
+        continue:
+                    SL0       s4
+                    ADD       s4, s5
+
+                    LOAD      s7, s4
+                    JUMP      fin_ISR
+
+
+
+
+; **************************************************************************************
+; Rutinas de delay por software
+; **************************************************************************************
+;
+; Retardo de 1us.
+; 
+;  Todas las instrucciones se ejecutan en 2 ciclos de clock por lo que los cálculos son predecibles. El '6' en
+; la siguiente ecuación permite 'CALL delay_1us'  en el código de inicio.
+; 
+; delay_1us_constant =  (clock_rate - 6)/4       donde 'clock_rate' está  en MHz
+; 
+; Registro usado s0
+; 
+delay_1us:          LOAD      s0, delay_1us_constant
+wait_1us:           SUB       s0, 1
+                    JUMP      NZ, wait_1us
+                    RET       
+; 
+; Retardo de 40us.
+; 
+; Registros usados s0, s1
+; 
+delay_40us:         LOAD      s1, 40              ; 40 x 1us = 40us
+wait_40us:          CALL      delay_1us
+                    SUB       s1, 1
+                    JUMP      NZ, wait_40us
+                    RET       
+; 
+; 
+; Retardo de 1ms.
+; 
+; Registros usadis s0, s1, s2
+; 
+delay_1ms:          LOAD      s2, 25              ; 25 x 40us = 1ms
+wait_1ms:           CALL      delay_40us
+                    SUB       s2, 1
+                    JUMP      NZ, wait_1ms
+                    RET       
+; 
+; Retardo de 20ms.
+; 
+; Retardo de 20ms usado en inicialización
+; 
+; Registros usados s0, s1, s2, s3
+; 
+delay_20ms:         LOAD      s3, 20              ; 20 x 1ms = 20ms
+wait_20ms:          CALL      delay_1ms
+                    SUB       s3, 1
+                    JUMP      NZ, wait_20ms
+                    RET       
+; 
+; Retardo de 250ms.
+; 
+; Retardo de 250ms usado en inicialización
+; 
+; Registros usados s0, s1, s2, s3
+; 
+delay_125ms:        LOAD      s3, 125              ; 125 x 1ms = 125ms
+wait_125ms:         CALL      delay_1ms
+                    SUB       s3, 1
+                    JUMP      NZ, wait_125ms
+                    RET       
+
+
+    
+
+;////////////////////////////////////////////////////////////////////////
+
+                            INTERRUPCIONES:
+
+;////////////////////////////////////////////////////////////////////////
+     IN        s4, Pin             ; leemos el dato
+     LOAD      s5, s4
+     LOAD      s8, s4         
+     LOAD      s4, s8         
+     AND       s4, $7F
+     AND       s5, $80             ; bit más significativo '1'
+     JUMP      Z, fromSWITCHS      ; dato via SWITCHS
+     JUMP      fromUART            ; dato via UART
+
+ISR:
+     ORG       $3FF                ; EL VECTOR DE INTERUPCIONES EN LA ULTIMA DIRECCION
+     JUMP      INTERRUPCIONES
+     
