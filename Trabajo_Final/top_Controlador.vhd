@@ -50,7 +50,6 @@ signal streaming_BYTE : STD_LOGIC_VECTOR (7 downto 0);
 signal salida_principal_H: std_logic;
 signal buf_salida_principal_H : std_logic;
 signal switch_UART_H : STD_LOGIC;
-signal buf_switch_UART_H : STD_LOGIC;
 
 signal Enable : STD_LOGIC;
 
@@ -81,7 +80,6 @@ signal dato_rom : STD_LOGIC_VECTOR (7 downto 0);
 --LCD
 signal passed: STD_LOGIC;
 signal next_data : std_logic;
-signal buf_next_direc : std_logic;
 signal buf_next_data : std_logic;
 signal out_REG : std_logic_vector(7 downto 0);
 signal port_id_PICO : std_logic_vector(7 downto 0);
@@ -190,10 +188,6 @@ end if;
 end process;
 
 
-switch_UART_H <= buf_switch_UART_H;
-next_direc <= buf_next_direc;
-
-
 TO_LEDS <= pre_leds when CONV_INTEGER(direccion) = 0 else "0000"&direccion;
 leds <= TO_LEDS;
 
@@ -207,7 +201,7 @@ interrupted <= interrupcion_pulsador or UART_buffer_data_present;
 interrupt_UART <= interrupt_ack when UART_buffer_data_present = '1' else '0';
 interrupt_PULSADOR <= interrupt_ack;
 
-buf_switch_UART_H <= port_id_PICO(0) and (not port_id_PICO(2)) and reading;
+switch_UART_H <= port_id_PICO(0) and (not port_id_PICO(2)) and reading;
 
 
 UART_and_SWITCHs: process(clk, rst)
@@ -237,7 +231,7 @@ strataflash <= (others => '1');
 
 
 --seccion memoria externa
-buf_next_direc <= port_id_PICO(2) and (not port_id_PICO(0)) and reading;--buf_
+next_direc <= port_id_PICO(2) and (not port_id_PICO(0)) and reading;--buf_
 process(clk,rst)
 begin
 if rst = '1' then
