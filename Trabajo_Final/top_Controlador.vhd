@@ -194,8 +194,8 @@ switch_UART_H <= buf_switch_UART_H;
 next_direc <= buf_next_direc;
 
 
---TO_LEDS <= pre_leds when CONV_INTEGER(direccion) = 0 else "0000"&direccion;
-leds <= pre_leds;--TO_LEDS;
+TO_LEDS <= pre_leds when CONV_INTEGER(direccion) = 0 else "0000"&direccion;
+leds <= TO_LEDS;
 
 data_SWITCH <= "0000"&switchs;
 data_UART <= '1'&streaming_BYTE(6 downto 0);
