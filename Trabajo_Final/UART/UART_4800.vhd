@@ -125,9 +125,10 @@ port map (serial_in => entrada_serial, data_out => UART_data_out, read_buffer =>
     buffer_full => buff_full, buffer_half_full => buff_half, clk => clk);
 
 
-registro1: registro_datos 
-port map (clk => clk, rst => rst, in_data=> UART_data_out,
-    out_data=> dato_sal, habilitador => next_data); 
+--registro1: registro_datos 
+--port map (clk => clk, rst => rst, in_data=> UART_data_out,
+--    out_data=> dato_sal, habilitador => next_data); 
+dato_sal <= UART_data_out;
 	  
 end Behavioral;
 
