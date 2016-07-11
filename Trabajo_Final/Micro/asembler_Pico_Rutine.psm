@@ -4,29 +4,151 @@
 ; directiva para crear el bloque de memoria
                     VHDL      "ROM_Pico3.vhd", "aplicacion.vhd", "memoria"
 
-Pin                 DSIN      $00                 ; puerto de entrada
-Pout                DSOUT     $01                 ; puerto de salida
+Pin_rawTP           DSIN      $01                 ; puerto de entrada
+Pin_mem_cartel      DSIN      $04                 ; puerto de entrada
+Pout_rawTP          DSOUT     $01                 ; puerto de salida
 
-delay_1us_constant  EQU       11
 digito              EQU       $FF
 caracter_cualquiera EQU       $0
 switchs             EQU       $0F
 
+
+; Interfaz con los puertos del LCD
+; 
+; La señal master enable no es utilizada por el display LCD, pero se puede 
+; requerir confirmación de que está activa la comunicación con el LCD.
+; Esto se requiere en la placa Spartan-3E Starter Kit si se utiliza la  StrataFLASH
+; porque comparte los mismos pines de datos y se deben prevenir conflictos.
+
+
+LCD_E                EQU        1                  ; active High Enable        E - bit0
+LCD_drive            EQU        8                  ; Master enable (active High) - bit3
+
+LCD_output_port      DSOUT     64                  ; Se envían datos al LCD
+
+
+; Constante para definir un delay por software de 1us. Este valor se debe ajustar para
+; reflejar el reloj aplicado a KCPSM3. Toda instrucción se ejecuta en 2 ciclos de clock, 
+; por lo que el cálculo se puede realizar en forma simple. El '6' en la siguiente ecuación permite
+; el llamado de 'CALL delay_1us' en el código de inicialización.
+;
+; delay_1us_constant =  (clock_rate - 6)/4       donde 'clock_rate' está en MHz
+; 
+; Ejemplo: Para un reloj de 50MHz el valor de la constante es (50-6)/4 = 11  (0B Hex).
+; Para rangos de reloj por debajo de  10MHz se debe utilizar el valor 1 y la operación 
+; resultará más lenta.
+; 
+delay_1us_constant  EQU       11
+;
+; ****** Definición registros *************************************************
+
+Lectura EQU sC  ; registro transitorio de lectura del dato  desde los switch
+
+;*************************************************************************
+; Tabla ASCII 
+; 
+character_a         EQU       97
+character_b         EQU       98
+character_c         EQU       99
+character_d         EQU       $64
+character_e         EQU       $65
+character_f         EQU       $66
+character_g         EQU       $67
+character_h         EQU       $68
+character_i         EQU       $69
+character_j         EQU       $6A
+character_k         EQU       $6B
+character_l         EQU       $6C
+character_m         EQU       $6D
+character_n         EQU       $6E
+character_o         EQU       $6F
+character_p         EQU       $70
+character_q         EQU       $71
+character_r         EQU       $72
+character_s         EQU       $73
+character_t         EQU       $74
+character_u         EQU       $75
+character_v         EQU       $76
+character_w         EQU       $77
+character_x         EQU       $78
+character_y         EQU       $79
+character_z         EQU       $7A
+character_Aa        EQU       65
+character_Bb        EQU       66
+character_Cc        EQU       67
+character_Dd        EQU       68
+character_Ee        EQU       69
+character_Ff        EQU       70
+character_Gg        EQU       71
+character_Hh        EQU       72
+character_Ii        EQU       73
+character_Jj        EQU       74
+character_Kk        EQU       75
+character_Ll        EQU       76
+character_Mm        EQU       77
+character_Nn        EQU       78
+character_Oo        EQU       79
+character_Pp        EQU       80
+character_Qq        EQU       81
+character_Rr        EQU       82
+character_Ss        EQU       83
+character_Tt        EQU       84
+character_Uu        EQU       85
+character_Vv        EQU       86
+character_Ww        EQU       87
+character_Xx        EQU       88
+character_Yy        EQU       89
+character_Zz        EQU       90
+
+character_0         EQU       48
+character_1         EQU       49
+character_2         EQU       50
+character_3         EQU       51
+character_4         EQU       52
+character_5         EQU       53
+character_6         EQU       54
+character_7         EQU       55
+character_8         EQU       56
+character_9         EQU       57
+character_colon     EQU       58                  ; ':'
+character_stop      EQU       46
+character_semi_colon EQU      59
+character_minus     EQU       45
+character_divide    EQU       47                  ; '/'
+character_plus      EQU       43
+character_comma     EQU       44
+character_less_than EQU       60
+character_greater_than EQU    62
+character_equals    EQU       61
+character_space     EQU       32
+character_CR        EQU       13                  ; carriage return
+character_question  EQU       63                  ; '?'
+character_dollar    EQU       36
+character_exclaim   EQU       33                  ; '!'
+character_BS        EQU       8                   ; Back Space command character
+ 
+
+
                     ORG       $00                 ; SE ALOCA EL CODIGO AL INICIO DEL BLOQUE DE MEMORIA
-                    
-                    XOR       s4, s4              ; para manipular la entrada y presentar los resultadosen el puerto de salida
-                    LOAD      s6, digito   
-                    XOR       s7, s7
-
-;////////////////////////////////////////////////////////////////////////
-Inicio:
-;////////////////////////////////////////////////////////////////////////
-
-
                     DINT                          ; SE DESHABILITAN LAS INTERRUPCIONES
-                    COMP      s6, digito
+
+;////////////////////////////////////////////////////////////////////////
+                              Inicio:
+;////////////////////////////////////////////////////////////////////////
+
+                    CALL      LCD_reset           ; Se inicializa el display LCD
+                    CALL      disp_cartel
+                    LOAD      sF, $20             ; Primera posición en la 2da línea del LCD
+
+                    XOR       S7, S7              ; para manipular la entrada y presentar los resultadosen el puerto de salida
+                    LOAD      S9, digito   
+                    XOR       SA, SA
+
+Principal:  
+                    DINT                          ; SE DESHABILITAN LAS INTERRUPCIONES
+                    COMP      S9, digito
                     JUMP      Z, sacar_dato       ; si es un digito salta
-                    COMP      s6, caracter_cualquiera
+                    COMP      S9, caracter_cualquiera
                     JUMP      NZ, sacar_dato      ; si SWITCHS salta
                     ; es un caracter cualquiera! 
 
@@ -36,53 +158,187 @@ intermitente:
                     call delay_125ms
                          
                     DINT                          ; SE DESHABILITAN LAS INTERRUPCIONES
-                    COMP      s6, digito
+                    COMP      S9, digito
                     JUMP      Z, digito_decimal   ; si es un digito salta
-                    COMP      s6, caracter_cualquiera
+                    COMP      S9, caracter_cualquiera
                     JUMP      NZ, sacar_dato      ; si SWITCHS salta
 
-                    XOR       s7, $FF             ; invierte bits
+                    XOR       SA, $FF             ; invierte bits
 
                     JUMP      sacar_dato          ; UART->caracter_cualquiera | SWITCHS
 
 digito_decimal:                                   ; es un numero!.
-                    LOAD      s7, $FF             ; enciendo todos los leds.
+                    LOAD      SA, $FF             ; enciendo todos los leds.
 
 
 sacar_dato:
                     EINT                          ; SE HABILITAN LAS INTERRUPCIONES
-                    OUT       s7, Pout
-                    JUMP      Inicio
+                    OUT       SA, Pout_rawTP
+                    JUMP      Principal
 
 
+             
+; **************************************************************************************
+; Mensaje a mostrar en el  LCD 
+; **************************************************************************************
+;
+; Se presenta 'TC FPGA 2016' en la posición indicada del cursor
+; 
+
+disp_cartel: 
+                LOAD      s6, 0
+    loop_cartel:
+                IN        s5, Pin_mem_cartel  ; leemos el dato
+                COMP      s5, 0               ; Es el (NUL) => '\0'
+                jump      Z, end_cartel       ; Mientras NO sea '\0'
+                CALL      LCD_write_data
+                CALL      delay_125ms
+                CALL      delay_125ms
+                ADD       s6, 1
+                jump      loop_cartel
+    end_cartel:
+                CALL      delay_125ms
+                CALL      delay_125ms
+                CALL      delay_125ms
+                CALL      delay_125ms
+                CALL      delay_125ms
+                CALL      delay_125ms
+;////////////////////////////////////////////////
+; desplazar lo escrito hacia la IZQ.
+;////////////////////////////////////////////////
+desp_IZQ:
+                LOAD      s6, 1
+    desplazar:
+                CALL      delay_20ms
+                CALL      delay_20ms
+                CALL      delay_20ms
+                LOAD      s5, $18
+                CALL      LCD_write_inst8
+                ADD       s6, 1
+                COMP      s6, 16                ; si son 16
+                jump      NZ, desplazar       ; Mientras haya datos que mover
+                ;RET
+
+    ;retardar:
+                ;LOAD      s6, 1
+                CALL      delay_125ms
+                CALL      delay_125ms
+                CALL      delay_125ms
+                CALL      delay_125ms
+                ;ADD       s6, 1
+                ;COMP      s6, 16                ; si son 16
+                ;jump      NZ, retardar       ; Mientras haya datos que mover
+;////////////////////////////////////////////////
+; desplazar lo escrito hacia la DER.
+;////////////////////////////////////////////////
+desp_DER:
+                LOAD        s5, 16             ; Linea 1 posición 0 (cursor)
+                CALL        LCD_cursor         ; se ubica el cursor
+                LOAD        s5, character_space
+                CALL        LCD_write_data
+                LOAD        s5, character_space
+                CALL        LCD_write_data
+                LOAD        s5, character_space
+                CALL        LCD_write_data
+                LOAD        s5, character_space
+                CALL        LCD_write_data
+                LOAD        s5, character_Dd
+                CALL        LCD_write_data
+                LOAD        s5, character_a
+                CALL        LCD_write_data
+                LOAD        s5, character_t
+                CALL        LCD_write_data
+                LOAD        s5, character_o
+                CALL        LCD_write_data
+                LOAD        s5, character_s
+                CALL        LCD_write_data
+                LOAD        s5, character_colon
+                CALL        LCD_write_data
+                LOAD        s5, character_space
+                CALL        LCD_write_data
+                LOAD        s5, character_space
+                CALL        LCD_write_data
+                LOAD        s5, character_space
+                CALL        LCD_write_data
+                LOAD        s6, 1
+    desplazar_D:
+                CALL      delay_20ms
+                CALL      delay_20ms
+                CALL      delay_20ms
+                CALL      delay_20ms
+                LOAD      s5, $1C
+                CALL      LCD_write_inst8
+                ADD       s6, 1
+                COMP      s6, 16                ; si son 16
+                jump      NZ, desplazar_D       ; Mientras haya datos que mover
+                ;RET
+                RET
+
+; 
+disp_space:         LOAD      s5, character_space
+                    CALL      LCD_write_data
+                    RET       
 
 
 
 ;--------------*--*-*-*--*-*--*-*-*-
 fromUART:
-                    LOAD      s7, $FF             ; enciendo todos los leds.
-                    LOAD      s5, s4
-                    AND       s5, $F0             ; tomo la parte alta del dato
-                    COMP      s5, $30             ; Se verifica si la parte alta es '0011'
+                    LOAD      S5, sF
+
+                    COMP      S5, $2F            ; si estaba antes de la última
+                    JUMP      C, empezar
+                    LOAD      sF, $2E            ; Linea 2 posición 15 (cursor) -- anteúltima
+        empezar:
+                    ADD       sF, 1
+                    CALL      LCD_cursor         ; se ubica el cursor
+                    LOAD      S5, S7
+            numero:
+                    COMP      S7, 48             ; compara con '0'
+                    JUMP      C, alfanumerico    ; esta por debajo de '0'
+                    COMP      S7, 58             ; compara con '9'
+                    JUMP      C, CONTINUAR       ; esta por encima de '9'
+
+            letra_May:
+                    COMP      S7, 65             ; compara con 'A'
+                    JUMP      C, alfanumerico    ; esta por encima de 'A'
+                    COMP      S7, 91             ; compara con 'Z'
+                    JUMP      C, CONTINUAR       ; esta por encima de 'Z'
+
+            letra_Min:
+                    COMP      S7, 97             ; compara con 'a'
+                    JUMP      C, alfanumerico    ; esta por encima de 'a'
+                    COMP      S7, 123            ; compara con 'z'
+                    JUMP      C, CONTINUAR       ; esta por encima de 'z'
+
+        alfanumerico:
+                    LOAD      S5, character_question
+
+        CONTINUAR:
+                    CALL      LCD_write_data      ; escribo el dato presente en el PBlaze
+
+                    LOAD      SA, $FF             ; enciendo todos los leds.
+                    LOAD      S8, S7
+                    AND       S8, $F0             ; tomo la parte alta del dato
+                    COMP      S8, $30             ; Se verifica si la parte alta es '0011'
                     JUMP      NZ, set_intermitente  ; si NO es igual pasa a intermitente
 
                     ;IGUALES
-                    LOAD      s5, s4
-                    AND       s5, $0F             ; tomo la parte baja del dato
-                    COMP      s5, $0A             ; Se verifica si es menor a '1010'
+                    LOAD      S8, S7
+                    AND       S8, $0F             ; tomo la parte baja del dato
+                    COMP      S8, $0A             ; Se verifica si es menor a '1010'
                     JUMP      NC, set_intermitente  ; si es mayor que 9 salta
 
-set_FIJO:           ;(NO intermitente)
-                    LOAD      s6, digito
+set_FIJO:           ;(NO intermitente) -> Es un Numero!
+                    LOAD      S9, digito
                     JUMP      fin_ISR
 
 
 set_intermitente:  
-                    LOAD      s6, caracter_cualquiera
+                    LOAD      S9, caracter_cualquiera ;  -> Es un caracter cualquiera!
 
 
 fin_ISR:
-                    RETI      ENABLE
+                    RETI      DISABLE
 
 
 
@@ -94,24 +350,80 @@ fin_ISR:
 ;--------------*--*-*-*--*-*--*-*-*-
 
 fromSWITCHS:                                      ; bucle en espera de interrupciones
+                    LOAD      sC, S7
+                    COMP      sC, $0A     
+                    JUMP      C, mostrar               
+
+                    LOAD      s5, sF
+                    COMP      s5, $2F            ; si estaba antes de la última
+                    JUMP      C, primeras_pos
+                    LOAD      sF, $2E            ; Linea 2 posición 15 (cursor) -- anteúltima
+        primeras_pos:
+                    ADD       sF, 1
+                    CALL      LCD_cursor         ; se ubica el cursor
+
+                    LOAD      s5, character_question
+                    CALL      LCD_write_data      ; escribo el dato presente en el PBlaze
+                    JUMP      FIJO
+            mostrar:
+                    CALL      Mostrar_Digito      ; escribo el dato presente en el PBlaze
+
 FIJO:               ;(NO intermitente)
-                    LOAD      s6, switchs
+                    LOAD      S9, switchs
 
-                    XOR       s5, s5               
-                    TEST      s4, $0F             
-                    JUMP      C, continue        ; NO tiene paridad impar
+                    XOR       S8, S8               
+                    TEST      S7, $0F             
+                    JUMP      C, continue         ; NO tiene paridad impar
                     
-                    SL1       s5
+                    SL1       S8
         continue:
-                    SL0       s4
-                    ADD       s4, s5
+                    SL0       S7
+                    ADD       S7, S8
 
-                    LOAD      s7, s4
+                    LOAD      SA, S7
                     JUMP      fin_ISR
 
 
 
 
+      
+
+
+
+
+
+;
+; **************************************************************************************
+; Rutina Mostrar_Digito
+; **************************************************************************************
+Mostrar_Digito:
+            LOAD s5, sF         ; Posición del cursor
+            CALL LCD_cursor         ; Se ubica el cursor 
+            LOAD s5, Lectura    ; se coloca el digito en el registro de trabajo
+            
+            COMP  s5, $0A       ; se detecta si es mayor a 9
+            JUMP C, completa_ascii  ; es menor a 9 se debe mostrar
+            CALL Fin_Tira
+            JUMP Fin_mostrar
+completa_ascii:
+            OR   s5, $30        ; se completa código ascii del dígito
+            CALL LCD_write_data ; se llama la rutina para mostrar en LCD
+            ADD sF,$01          ; Siguiente posición del cursor
+            COMP sF, $2F
+            JUMP C, Fin_mostrar ; se puede escribir en la posición
+            LOAD sF, $2F ; Se superó la última posición se sobreescribe el último dígito
+Fin_mostrar: RET
+; **************************************************************************************
+            
+; Rutina que finaliza el ingreso de la tira de dígitos
+; **************************************************************************************
+Fin_Tira:       
+            CALL        LCD_reset 
+            LOAD        s5, 16              ; Linea 1 posición 0 (cursor)
+            CALL        LCD_cursor        ; se ubica el cursor
+            CALL        disp_cartel        ; Se muestra TC FPGA 2016
+            LOAD        sF, $20            ; Para colocar el cursor al inicio de 2da línea
+            RET
 ; **************************************************************************************
 ; Rutinas de delay por software
 ; **************************************************************************************
@@ -162,10 +474,9 @@ wait_20ms:          CALL      delay_1ms
                     SUB       s3, 1
                     JUMP      NZ, wait_20ms
                     RET       
+                    
 ; 
-; Retardo de 250ms.
-; 
-; Retardo de 250ms usado en inicialización
+; Retardo de 125ms.
 ; 
 ; Registros usados s0, s1, s2, s3
 ; 
@@ -173,6 +484,168 @@ delay_125ms:        LOAD      s3, 125              ; 125 x 1ms = 125ms
 wait_125ms:         CALL      delay_1ms
                     SUB       s3, 1
                     JUMP      NZ, wait_125ms
+                    RET     
+;
+; **************************************************************************************
+; LCD Character Module Routines
+; **************************************************************************************
+; 
+; LCD module is a 16 character by 2 line display but all displays are very similar
+; The 4-wire data interface will be used (DB4 to DB7).
+; 
+; The LCD modules are relatively slow and software delay loops are used to slow down
+; KCPSM3 adequately for the LCD to communicate. The delay routines are provided in
+; a different section (see above in this case).
+; 
+; 
+; Pulse LCD enable signal 'E' high for greater than 230ns (1us is used).
+; 
+; Register s4 should define the current state of the LCD output port.
+; 
+; Registers used s0, s4
+; 
+LCD_pulse_E:        XOR       s4, LCD_E           ; E=1
+                    OUT       s4, LCD_output_port
+                    CALL      delay_1us
+                    XOR       s4, LCD_E           ; E=0
+                    OUT       s4, LCD_output_port
+                    RET       
+; 
+; Write 4-bit instruction to LCD display.
+; 
+; The 4-bit instruction should be provided in the upper 4-bits of register s4.
+; Note that this routine does not release the master enable but as it is only
+; used during initialisation and as part of the 8-bit instruction write it
+; should be acceptable.
+; 
+; Registers used s4
+; 
+LCD_write_inst4:    AND       s4, $F8             ; Enable=1 RS=0 Instruction, RW=0 Write, E=0
+                    OUT       s4, LCD_output_port ; set up RS and RW >40ns before enable pulse
+                    CALL      LCD_pulse_E
+                    RET       
+; 
+; 
+; Write 8-bit instruction to LCD display.
+; 
+; The 8-bit instruction should be provided in register s5.
+; Instructions are written using the following sequence
+; Upper nibble
+; wait >1us
+; Lower nibble
+; wait >40us
+; 
+; Registers used s0, s1, s4, s5
+; 
+LCD_write_inst8:    LOAD      s4, s5
+                    AND       s4, $F0             ; Enable=0 RS=0 Instruction, RW=0 Write, E=0
+                    OR        s4, LCD_drive       ; Enable=1
+                    CALL      LCD_write_inst4     ; write upper nibble
+                    CALL      delay_1us           ; wait >1us
+                    LOAD      s4, s5              ; select lower nibble with
+                    SL1       s4                  ; Enable=1
+                    SL0       s4                  ; RS=0 Instruction
+                    SL0       s4                  ; RW=0 Write
+                    SL0       s4                  ; E=0
+                    CALL      LCD_write_inst4     ; write lower nibble
+                    CALL      delay_40us          ; wait >40us
+                    LOAD      s4, $F0             ; Enable=0 RS=0 Instruction, RW=0 Write, E=0
+                    OUT       s4, LCD_output_port ; Release master enable
+                    RET       
+;
+; Write 8-bit data to LCD display.
+; 
+; The 8-bit data should be provided in register s5.
+; Data bytes are written using the following sequence
+; Upper nibble
+; wait >1us
+; Lower nibble
+; wait >40us
+; 
+; Registers used s0, s1, s4, s5
+; 
+LCD_write_data:     LOAD      s4, s5
+                    AND       s4, $F0             ; Enable=0 RS=0 Instruction, RW=0 Write, E=0
+                    OR        s4, 12              ; Enable=1 RS=1 Data, RW=0 Write, E=0
+                    OUT       s4, LCD_output_port ; set up RS and RW >40ns before enable pulse
+                    CALL      LCD_pulse_E         ; write upper nibble
+                    CALL      delay_1us           ; wait >1us
+                    LOAD      s4, s5              ; select lower nibble with
+                    SL1       s4                  ; Enable=1
+                    SL1       s4                  ; RS=1 Data
+                    SL0       s4                  ; RW=0 Write
+                    SL0       s4                  ; E=0
+                    OUT       s4, LCD_output_port ; set up RS and RW >40ns before enable pulse
+                    CALL      LCD_pulse_E         ; write lower nibble
+                    CALL      delay_40us          ; wait >40us
+                    LOAD      s4, $F0             ; Enable=0 RS=0 Instruction, RW=0 Write, E=0
+                    OUT       s4, LCD_output_port ; Release master enable
+                    RET       
+; 
+
+; 
+; Reset and initialise display to communicate using 4-bit data mode
+; Includes routine to clear the display.
+; 
+; Requires the 4-bit instructions 3,3,3,2 to be sent with suitable delays
+; following by the 8-bit instructions to set up the display.
+; 
+; 28 = '001' Function set, '0' 4-bit mode, '1' 2-line, '0' 5x7 dot matrix, 'xx'
+; 06 = '000001' Entry mode, '1' increment, '0' no display shift
+; 0C = '00001' Display control, '1' display on, '0' cursor off, '0' cursor blink off
+; 01 = '00000001' Display clear
+; 
+; Registers used s0, s1, s2, s3, s4
+; 
+LCD_reset:          CALL      delay_20ms          ; wait more that 15ms for display to be ready
+                    LOAD      s4, 48
+                    CALL      LCD_write_inst4     ; send '3'
+                    CALL      delay_20ms          ; wait >4.1ms
+                    CALL      LCD_write_inst4     ; send '3'
+                    CALL      delay_1ms           ; wait >100us
+                    CALL      LCD_write_inst4     ; send '3'
+                    CALL      delay_40us          ; wait >40us
+                    LOAD      s4, 32
+                    CALL      LCD_write_inst4     ; send '2'
+                    CALL      delay_40us          ; wait >40us
+                    LOAD      s5, 40              ; Function set
+                    CALL      LCD_write_inst8
+                    LOAD      s5, 6               ; Entry mode
+                    CALL      LCD_write_inst8
+                    LOAD      s5, 12              ; Display control
+                    CALL      LCD_write_inst8
+LCD_clear:          LOAD      s5, 1               ; Display clear
+                    CALL      LCD_write_inst8
+                    CALL      delay_1ms           ; wait >1.64ms for display to clear
+                    CALL      delay_1ms
+                    RET       
+; 
+; Position the cursor ready for characters to be written.
+; The display is formed of 2 lines of 16 characters and each
+; position has a corresponding address as indicated below.
+; 
+; Character position
+; 0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
+; 
+; Line 1 - 80 81 82 83 84 85 86 87 88 89 8A 8B 8C 8D 8E 8F
+; Line 2 - C0 C1 C2 C3 C4 C5 C6 C7 C8 C9 CA CB CC CD CE CF
+; 
+; This routine will set the cursor position using the value provided
+; in register s5. The upper nibble will define the line and the lower
+; nibble the character position on the line.
+; Example s5 = 2B will position the cursor on line 2 position 11
+; 
+; Registers used s0, s1, s2, s3, s4
+; 
+LCD_cursor:         TEST      s5, 16              ; test for line 1
+                    JUMP      Z, set_line2
+                    AND       s5, 15              ; make address in range 80 to 8F for line 1
+                    OR        s5, $80
+                    CALL      LCD_write_inst8     ; instruction write to set cursor
+                    RET       
+set_line2:          AND       s5, 15              ; make address in range C0 to CF for line 2
+                    OR        s5, $C0
+                    CALL      LCD_write_inst8     ; instruction write to set cursor
                     RET       
 
 
@@ -183,14 +656,14 @@ wait_125ms:         CALL      delay_1ms
                             INTERRUPCIONES:
 
 ;////////////////////////////////////////////////////////////////////////
-     IN        s4, Pin             ; leemos el dato
-     LOAD      s5, s4
-     LOAD      s8, s4         
-     LOAD      s4, s8         
-     AND       s4, $7F
-     AND       s5, $80             ; bit más significativo '1'
-     JUMP      Z, fromSWITCHS      ; dato via SWITCHS
-     JUMP      fromUART            ; dato via UART
+        IN        S7, Pin_rawTP       ; leemos el dato
+        LOAD      S8, S7
+        ;LOAD      SB, S7         
+        ;LOAD      S7, SB         
+        AND       S7, $7F     
+        AND       S8, $80             ; bit más significativo '1'
+        JUMP      Z, fromSWITCHS      ; dato via SWITCHS
+        JUMP      fromUART            ; dato via UART
 
 ISR:
      ORG       $3FF                ; EL VECTOR DE INTERUPCIONES EN LA ULTIMA DIRECCION
