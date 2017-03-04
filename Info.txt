@@ -1,0 +1,4 @@
+En los ejemplos de LCD, Trabajo Final; aparece la carpeta "Micro",
+que contiene archivos que se reutilizan, para evitar modificaciones entre las 
+distintas carpetas crear "Una Sola" para que sepa cuales son los archivos
+que puedo modificar el dia de mañana...
