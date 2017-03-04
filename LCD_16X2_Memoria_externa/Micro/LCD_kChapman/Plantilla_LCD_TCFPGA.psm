@@ -1,0 +1,526 @@
+; Síntesis de sistemas digitales en FPGA
+; Plantilla para manejo del LCD de la placa Spartan 3E
+; Se integra en el TOP de PB que maneja el LCD
+; Funcionamiento implementado:
+; Al inicio se escribe  en el LCD el cartel: TC FPGA 2016
+; Luego cuando se recibe un pedido de interrupción
+; se muestran en orden en la segunda línea del LCD los dígitos decimales  que
+ ; se ingresan en los switch de la placa. El fin del ingreso de una tira se
+; indica con un valor mayor a 9. Entonces se borra la tira mostrada y se
+; espera por el ingreso de una nueva tira de dígitos decimales.
+; Si se ingresan más que 16 dígitos se comienza a sobreescribir el último
+; Se utilizan rutinas desarrolladas por K. Chapman para manejo del LCD
+; **********************************************************************************
+
+; directiva para crear el bloque de memoria
+
+   VHDL      "ROM_Pico3.vhd", "aplicacion.vhd", "memoria"
+
+
+; Interfaz con los puertos del LCD
+; 
+; La señal master enable no es utilizada por el display LCD, pero se puede 
+; requerir confirmación de que está activa la comunicación con el LCD.
+; Esto se requiere en la placa Spartan-3E Starter Kit si se utiliza la  StrataFLASH
+; porque comparte los mismos pines de datos y se deben prevenir conflictos.
+
+
+LCD_E                EQU        1                  ; active High Enable        E - bit0
+LCD_drive            EQU        8                  ; Master enable (active High) - bit3
+LCD_output_port      DSOUT     64                  ; Se envían datos al LCD
+En_switch            DSIN      16                  ; ingresa dato desde puerto de entrada
+;FIRST_DATA           DSOUT     16                  ; Se pide el primer dato
+;next_direc           DSOUT     32                  ; Se pide incrementar la dirección de la MEMORIA
+PIN                  DSIN       4                  ; ingresa dato desde puerto de entrada
+;
+
+; Constante para definir un delay por software de 1us. Este valor se debe ajustar para
+; reflejar el reloj aplicado a KCPSM3. Toda instrucción se ejecuta en 2 ciclos de clock, 
+; por lo que el cálculo se puede realizar en forma simple. El '6' en la siguiente ecuación permite
+; el llamado de 'CALL delay_1us' en el código de inicialización.
+;
+; delay_1us_constant =  (clock_rate - 6)/4       donde 'clock_rate' está en MHz
+; 
+; Ejemplo: Para un reloj de 50MHz el valor de la constante es (50-6)/4 = 11  (0B Hex).
+; Para rangos de reloj por debajo de  10MHz se debe utilizar el valor 1 y la operación 
+; resultará más lenta.
+; 
+delay_1us_constant  EQU       11
+;
+; ****** Definición registros *************************************************
+
+Lectura EQU sC  ; registro transitorio de lectura del dato  desde los switch
+
+;*************************************************************************
+; Tabla ASCII 
+; 
+character_a         EQU       97
+character_b         EQU       98
+character_c         EQU       99
+character_d         EQU       $64
+character_e         EQU       $65
+character_f         EQU       $66
+character_g         EQU       $67
+character_h         EQU       $68
+character_i         EQU       $69
+character_j         EQU       $6A
+character_k         EQU       $6B
+character_l         EQU       $6C
+character_m         EQU       $6D
+character_n         EQU       $6E
+character_o         EQU       $6F
+character_p         EQU       $70
+character_q         EQU       $71
+character_r         EQU       $72
+character_s         EQU       $73
+character_t         EQU       $74
+character_u         EQU       $75
+character_v         EQU       $76
+character_w         EQU       $77
+character_x         EQU       $78
+character_y         EQU       $79
+character_z         EQU       $7A
+character_Aa        EQU       65
+character_Bb        EQU       66
+character_Cc        EQU       67
+character_Dd        EQU       68
+character_Ee        EQU       69
+character_Ff        EQU       70
+character_Gg        EQU       71
+character_Hh        EQU       72
+character_Ii        EQU       73
+character_Jj        EQU       74
+character_Kk        EQU       75
+character_Ll        EQU       76
+character_Mm        EQU       77
+character_Nn        EQU       78
+character_Oo        EQU       79
+character_Pp        EQU       80
+character_Qq        EQU       81
+character_Rr        EQU       82
+character_Ss        EQU       83
+character_Tt        EQU       84
+character_Uu        EQU       85
+character_Vv        EQU       86
+character_Ww        EQU       87
+character_Xx        EQU       88
+character_Yy        EQU       89
+character_Zz        EQU       90
+
+character_0         EQU       48
+character_1         EQU       49
+character_2         EQU       50
+character_3         EQU       51
+character_4         EQU       52
+character_5         EQU       53
+character_6         EQU       54
+character_7         EQU       55
+character_8         EQU       56
+character_9         EQU       57
+character_colon     EQU       58
+character_stop      EQU       46
+character_semi_colon EQU      59
+character_minus     EQU       45
+character_divide    EQU       47                  ; '/'
+character_plus      EQU       43
+character_comma     EQU       44
+character_less_than EQU       60
+character_greater_than EQU    62
+character_equals    EQU       61
+character_space     EQU       32
+character_CR        EQU       13                  ; carriage return
+character_question  EQU       63                  ; '?'
+character_dollar    EQU       36
+character_exclaim   EQU       33                  ; '!'
+character_BS        EQU       8                   ; Back Space command character
+; 
+; **************************************************************************************
+; Inicialización
+; **************************************************************************************
+ 
+Inicio:      CALL       LCD_reset           ; Se inicializa el display LCD
+
+ 
+Principal:        
+            XOR         Lectura, Lectura    ; Se limpia el registro
+    
+            LOAD        s5, 16             ; Linea 1 posición 0 (cursor)
+            CALL        LCD_cursor         ; se ubica el cursor
+            CALL        disp_cartel        ; Se muestra TC FPGA 2016
+            LOAD        sF, $20            ; Primera posición en la 2da línea del LCD
+;            EINT                           ; Se habilitan interrupciones    
+                    
+Bucle:                      
+            JUMP        Bucle           ;Se espera interrupción
+                    
+; **************************************************************************************
+; Mensaje a mostrar en el  LCD 
+; **************************************************************************************
+;
+; Se presenta 'TC FPGA 2016' en la posición indicada del cursor
+; 
+
+disp_cartel: 
+                LOAD      s6, 0
+    loop_cartel:
+                IN        s5, PIN             ; leemos el dato
+                COMP      s5, 0               ; Es el (NUL) => '\0'
+                jump      Z, end_cartel       ; Mientras NO sea '\0'
+                CALL      LCD_write_data
+                CALL      delay_125ms
+                CALL      delay_125ms
+                ADD       s6, 1
+                jump      loop_cartel
+    end_cartel:
+                CALL      delay_125ms
+                CALL      delay_125ms
+                CALL      delay_125ms
+                CALL      delay_125ms
+                CALL      delay_125ms
+                CALL      delay_125ms
+;////////////////////////////////////////////////
+; desplazar lo escrito hacia la IZQ.
+;////////////////////////////////////////////////
+desp_IZQ:
+                LOAD      s6, 1
+    desplazar:
+                CALL      delay_20ms
+                CALL      delay_20ms
+                CALL      delay_20ms
+                LOAD      s5, $18
+                CALL      LCD_write_inst8
+                ADD       s6, 1
+                COMP      s6, 16                ; si son 16
+                jump      NZ, desplazar       ; Mientras haya datos que mover
+                ;RET
+
+    ;retardar:
+                ;LOAD      s6, 1
+                CALL      delay_125ms
+                CALL      delay_125ms
+                CALL      delay_125ms
+                CALL      delay_125ms
+                ;ADD       s6, 1
+                ;COMP      s6, 16                ; si son 16
+                ;jump      NZ, retardar       ; Mientras haya datos que mover
+;////////////////////////////////////////////////
+; desplazar lo escrito hacia la DER.
+;////////////////////////////////////////////////
+desp_DER:
+                LOAD        s5, 16             ; Linea 1 posición 0 (cursor)
+                CALL        LCD_cursor         ; se ubica el cursor
+                LOAD        s5, character_space
+                CALL        LCD_write_data
+                LOAD        s5, character_space
+                CALL        LCD_write_data
+                LOAD        s5, character_space
+                CALL        LCD_write_data
+                LOAD        s5, character_space
+                CALL        LCD_write_data
+                LOAD        s5, character_Tt
+                CALL        LCD_write_data
+                LOAD        s5, character_e
+                CALL        LCD_write_data
+                LOAD        s5, character_r
+                CALL        LCD_write_data
+                LOAD        s5, character_m
+                CALL        LCD_write_data
+                LOAD        s5, character_i
+                CALL        LCD_write_data
+                LOAD        s5, character_n
+                CALL        LCD_write_data
+                LOAD        s5, character_e
+                CALL        LCD_write_data
+                LOAD        s5, character_space
+                CALL        LCD_write_data
+                LOAD        s5, character_space
+                CALL        LCD_write_data
+                LOAD        s6, 1
+    desplazar_D:
+                CALL      delay_20ms
+                CALL      delay_20ms
+                CALL      delay_20ms
+                CALL      delay_20ms
+                LOAD      s5, $1C
+                CALL      LCD_write_inst8
+                ADD       s6, 1
+                COMP      s6, 16                ; si son 16
+                jump      NZ, desplazar_D       ; Mientras haya datos que mover
+                ;RET
+
+                EINT                           ; Se habilitan interrupciones    
+                RET
+
+; 
+disp_space:         LOAD      s5, character_space
+                    CALL      LCD_write_data
+                    RET       
+
+; ****************************************************************************
+; Rutina de interrupciones
+;****************************************************************************
+INTERRUPCIONES:
+               IN Lectura, En_switch    ; se guarda el dato desde el puerto de entrada
+               CALL Mostrar_Digito  ; Se presenta un dígito decimal de la tira
+               
+Fin_I:         RETI ENABLE  ; Se vuelve habilitando las interrupciones
+
+;
+; **************************************************************************************
+; Rutina Mostrar_Digito
+; **************************************************************************************
+Mostrar_Digito:
+            LOAD s5, sF         ; Posición del cursor
+            CALL LCD_cursor         ; Se ubica el cursor 
+            LOAD s5, Lectura    ; se coloca el digito en el registro de trabajo
+            
+            COMP  s5, $0A       ; se detecta si es mayor a 9
+            JUMP C, completa_ascii  ; es menor a 9 se debe mostrar
+            CALL Fin_Tira
+            JUMP Fin_mostrar
+completa_ascii:
+            OR   s5, $30        ; se completa código ascii del dígito
+            CALL LCD_write_data ; se llama la rutina para mostrar en LCD
+            ADD sF,$01          ; Siguiente posición del cursor
+            COMP sF, $2F
+            JUMP C, Fin_mostrar ; se puede escribir en la posición
+            LOAD sF, $2F ; Se superó la última posición se sobreescribe el último dígito
+Fin_mostrar: RET
+; **************************************************************************************
+            
+; Rutina que finaliza el ingreso de la tira de dígitos
+; **************************************************************************************
+Fin_Tira:       
+            CALL        LCD_reset 
+            LOAD        s5, 16              ; Linea 1 posición 0 (cursor)
+            CALL        LCD_cursor        ; se ubica el cursor
+            CALL        disp_cartel        ; Se muestra TC FPGA 2016
+            LOAD        sF, $20            ; Para colocar el cursor al inicio de 2da línea
+            RET
+; **************************************************************************************
+; Rutinas de delay por software
+; **************************************************************************************
+;
+; Retardo de 1us.
+; 
+;  Todas las instrucciones se ejecutan en 2 ciclos de clock por lo que los cálculos son predecibles. El '6' en
+; la siguiente ecuación permite 'CALL delay_1us'  en el código de inicio.
+; 
+; delay_1us_constant =  (clock_rate - 6)/4       donde 'clock_rate' está  en MHz
+; 
+; Registro usado s0
+; 
+delay_1us:          LOAD      s0, delay_1us_constant
+wait_1us:           SUB       s0, 1
+                    JUMP      NZ, wait_1us
+                    RET       
+; 
+; Retardo de 40us.
+; 
+; Registros usados s0, s1
+; 
+delay_40us:         LOAD      s1, 40              ; 40 x 1us = 40us
+wait_40us:          CALL      delay_1us
+                    SUB       s1, 1
+                    JUMP      NZ, wait_40us
+                    RET       
+; 
+; 
+; Retardo de 1ms.
+; 
+; Registros usadis s0, s1, s2
+; 
+delay_1ms:          LOAD      s2, 25              ; 25 x 40us = 1ms
+wait_1ms:           CALL      delay_40us
+                    SUB       s2, 1
+                    JUMP      NZ, wait_1ms
+                    RET       
+; 
+; Retardo de 20ms.
+; 
+; Retardo de 20ms usado en inicialización
+; 
+; Registros usados s0, s1, s2, s3
+; 
+delay_20ms:         LOAD      s3, 20              ; 20 x 1ms = 20ms
+wait_20ms:          CALL      delay_1ms
+                    SUB       s3, 1
+                    JUMP      NZ, wait_20ms
+                    RET       
+
+; 
+; Retardo de 125ms.
+; 
+; Registros usados s0, s1, s2, s3
+; 
+delay_125ms:        LOAD      s3, 125              ; 125 x 1ms = 125ms
+wait_125ms:         CALL      delay_1ms
+                    SUB       s3, 1
+                    JUMP      NZ, wait_125ms
+                    RET       
+
+;
+; **************************************************************************************
+; LCD Character Module Routines
+; **************************************************************************************
+; 
+; LCD module is a 16 character by 2 line display but all displays are very similar
+; The 4-wire data interface will be used (DB4 to DB7).
+; 
+; The LCD modules are relatively slow and software delay loops are used to slow down
+; KCPSM3 adequately for the LCD to communicate. The delay routines are provided in
+; a different section (see above in this case).
+; 
+; 
+; Pulse LCD enable signal 'E' high for greater than 230ns (1us is used).
+; 
+; Register s4 should define the current state of the LCD output port.
+; 
+; Registers used s0, s4
+; 
+LCD_pulse_E:        XOR       s4, LCD_E           ; E=1
+                    OUT       s4, LCD_output_port
+                    CALL      delay_1us
+                    XOR       s4, LCD_E           ; E=0
+                    OUT       s4, LCD_output_port
+                    RET       
+; 
+; Write 4-bit instruction to LCD display.
+; 
+; The 4-bit instruction should be provided in the upper 4-bits of register s4.
+; Note that this routine does not release the master enable but as it is only
+; used during initialisation and as part of the 8-bit instruction write it
+; should be acceptable.
+; 
+; Registers used s4
+; 
+LCD_write_inst4:    AND       s4, $F8             ; Enable=1 RS=0 Instruction, RW=0 Write, E=0
+                    OUT       s4, LCD_output_port ; set up RS and RW >40ns before enable pulse
+                    CALL      LCD_pulse_E
+                    RET       
+; 
+; 
+; Write 8-bit instruction to LCD display.
+; 
+; The 8-bit instruction should be provided in register s5.
+; Instructions are written using the following sequence
+; Upper nibble
+; wait >1us
+; Lower nibble
+; wait >40us
+; 
+; Registers used s0, s1, s4, s5
+; 
+LCD_write_inst8:    LOAD      s4, s5
+                    AND       s4, $F0             ; Enable=0 RS=0 Instruction, RW=0 Write, E=0
+                    OR        s4, LCD_drive       ; Enable=1
+                    CALL      LCD_write_inst4     ; write upper nibble
+                    CALL      delay_1us           ; wait >1us
+                    LOAD      s4, s5              ; select lower nibble with
+                    SL1       s4                  ; Enable=1
+                    SL0       s4                  ; RS=0 Instruction
+                    SL0       s4                  ; RW=0 Write
+                    SL0       s4                  ; E=0
+                    CALL      LCD_write_inst4     ; write lower nibble
+                    CALL      delay_40us          ; wait >40us
+                    LOAD      s4, $F0             ; Enable=0 RS=0 Instruction, RW=0 Write, E=0
+                    OUT       s4, LCD_output_port ; Release master enable
+                    RET       
+;
+; Write 8-bit data to LCD display.
+; 
+; The 8-bit data should be provided in register s5.
+; Data bytes are written using the following sequence
+; Upper nibble
+; wait >1us
+; Lower nibble
+; wait >40us
+; 
+; Registers used s0, s1, s4, s5
+; 
+LCD_write_data:     LOAD      s4, s5
+                    AND       s4, $F0             ; Enable=0 RS=0 Instruction, RW=0 Write, E=0
+                    OR        s4, 12              ; Enable=1 RS=1 Data, RW=0 Write, E=0
+                    OUT       s4, LCD_output_port ; set up RS and RW >40ns before enable pulse
+                    CALL      LCD_pulse_E         ; write upper nibble
+                    CALL      delay_1us           ; wait >1us
+                    LOAD      s4, s5              ; select lower nibble with
+                    SL1       s4                  ; Enable=1
+                    SL1       s4                  ; RS=1 Data
+                    SL0       s4                  ; RW=0 Write
+                    SL0       s4                  ; E=0
+                    OUT       s4, LCD_output_port ; set up RS and RW >40ns before enable pulse
+                    CALL      LCD_pulse_E         ; write lower nibble
+                    CALL      delay_40us          ; wait >40us
+                    LOAD      s4, $F0             ; Enable=0 RS=0 Instruction, RW=0 Write, E=0
+                    OUT       s4, LCD_output_port ; Release master enable
+                    RET       
+; 
+
+; 
+; Reset and initialise display to communicate using 4-bit data mode
+; Includes routine to clear the display.
+; 
+; Requires the 4-bit instructions 3,3,3,2 to be sent with suitable delays
+; following by the 8-bit instructions to set up the display.
+; 
+; 28 = '001' Function set, '0' 4-bit mode, '1' 2-line, '0' 5x7 dot matrix, 'xx'
+; 06 = '000001' Entry mode, '1' increment, '0' no display shift
+; 0C = '00001' Display control, '1' display on, '0' cursor off, '0' cursor blink off
+; 01 = '00000001' Display clear
+; 
+; Registers used s0, s1, s2, s3, s4
+; 
+LCD_reset:          CALL      delay_20ms          ; wait more that 15ms for display to be ready
+                    LOAD      s4, 48
+                    CALL      LCD_write_inst4     ; send '3'
+                    CALL      delay_20ms          ; wait >4.1ms
+                    CALL      LCD_write_inst4     ; send '3'
+                    CALL      delay_1ms           ; wait >100us
+                    CALL      LCD_write_inst4     ; send '3'
+                    CALL      delay_40us          ; wait >40us
+                    LOAD      s4, 32
+                    CALL      LCD_write_inst4     ; send '2'
+                    CALL      delay_40us          ; wait >40us
+                    LOAD      s5, 40              ; Function set
+                    CALL      LCD_write_inst8
+                    LOAD      s5, 6               ; Entry mode
+                    CALL      LCD_write_inst8
+                    LOAD      s5, 12              ; Display control
+                    CALL      LCD_write_inst8
+LCD_clear:          LOAD      s5, 1               ; Display clear
+                    CALL      LCD_write_inst8
+                    CALL      delay_1ms           ; wait >1.64ms for display to clear
+                    CALL      delay_1ms
+                    RET       
+; 
+; Position the cursor ready for characters to be written.
+; The display is formed of 2 lines of 16 characters and each
+; position has a corresponding address as indicated below.
+; 
+; Character position
+; 0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
+; 
+; Line 1 - 80 81 82 83 84 85 86 87 88 89 8A 8B 8C 8D 8E 8F
+; Line 2 - C0 C1 C2 C3 C4 C5 C6 C7 C8 C9 CA CB CC CD CE CF
+; 
+; This routine will set the cursor position using the value provided
+; in register s5. The upper nibble will define the line and the lower
+; nibble the character position on the line.
+; Example s5 = 2B will position the cursor on line 2 position 11
+; 
+; Registers used s0, s1, s2, s3, s4
+; 
+LCD_cursor:         TEST      s5, 16              ; test for line 1
+                    JUMP      Z, set_line2
+                    AND       s5, 15              ; make address in range 80 to 8F for line 1
+                    OR        s5, $80
+                    CALL      LCD_write_inst8     ; instruction write to set cursor
+                    RET       
+set_line2:          AND       s5, 15              ; make address in range C0 to CF for line 2
+                    OR        s5, $C0
+                    CALL      LCD_write_inst8     ; instruction write to set cursor
+                    RET       
+; 
+                    ORG       $3FF                ; EL VECTOR DE INTERUPCIONES EN LA ULTIMA DIRECCION
+                    JUMP      INTERRUPCIONES      ; a la rutina de servicio
