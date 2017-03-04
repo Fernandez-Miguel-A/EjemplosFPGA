@@ -159,11 +159,11 @@ if rst = '1' then
 elsif clk = '1' and clk'event then
     case estado_SUB2 is
         when sSUB_1 =>
-            if finalice300 = '0' and startRotation = '1' then
+            if startRotation = '1' then
                 estado_SUB2 <= sSUB_2;
             end if;
         when sSUB_2 =>
-            if finalice300 = '1' then
+            if startRotation = '0' then
                 estado_SUB2 <= sSUB_1;
             end if;
     end case;
@@ -171,10 +171,11 @@ end if;
 end process;
 
 process(estado_SUB2)
-begin
+    variable cuenta: integer 0 to 200000; -- Innecesario
+    begin
     case estado_SUB2 is
         when sSUB_1 =>
-            timer300 <= '0';
+            LEDS <= '0'; -- Incongruencia de Tipos, debiera ser de tamaño (8). Antes estaba "timer300 <= '0';"
         when sSUB_2 =>
             timer300 <= '1';
         --when others =>
